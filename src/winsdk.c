@@ -1,15 +1,11 @@
-#include <wchar.h>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shellapi.h>
 
-#pragma comment(linker, "/entry:start")
-#pragma comment(linker, "/subsystem:console")
-
 wchar_t const usage[] =
 L"winsdk\n"
 L"   --kit:{um, ucrt}\n"
-L"   --type:{include,lib}\n"
+L"   --type:{include, lib}\n"
 L"   [--arch:{x86, x64, arm, arm64}]   (required if --type:lib)\n"
 L"   [--version:10.0.00000.0]          (12 characters max)\n";
 
@@ -25,19 +21,10 @@ wchar_t const regVal[] =
 #define DWORD_PTR *(DWORD *)
 #define QWORD_PTR *(size_t *)
 
-void start(void) {
+int __stdcall start(void) {
    HANDLE const hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
    if (hStdout == INVALID_HANDLE_VALUE) {
       goto BAD_END_WINDOWS;
-   }
-
-   int argc;
-   wchar_t const *const *restrict argv = (wchar_t const **)
-      CommandLineToArgvW(GetCommandLineW(), &argc);
-
-   // only --kit and --type are needed
-   if (argc < 3 || argc > 5) {
-      goto BAD_END_USAGE;
    }
 
    enum kit {kit_bottom, um, ucrt} kit = kit_bottom;
@@ -45,123 +32,132 @@ void start(void) {
    enum arch {arch_bottom, x86, x64, arm, arm64} arch = arch_bottom;
    wchar_t const *restrict version = NULL;
 
-   for (wchar_t const *restrict arg; (arg = *++argv);) {
-      // all command line arguments should start with "--"
-      if (DWORD_PTR arg != DWORD_PTR L"--") {
-         goto BAD_END_USAGE;
-      }
-      arg += 2;
+   {
+      int argc;
+      wchar_t const *const *restrict argv = (wchar_t const **)
+         CommandLineToArgvW(GetCommandLineW(), &argc);
 
-      // --kit:
-      if (QWORD_PTR arg == QWORD_PTR L"kit:") {
-         if (kit != kit_bottom) {
-            goto BAD_END_USAGE;
-         }
-         arg += 4;
-
-         // all valid options begin with "u"
-         if (*arg++ != L'u') {
-            goto BAD_END_USAGE;
-         }
-
-         // --kit:um
-         if (DWORD_PTR (arg + 0) == DWORD_PTR L"m") {
-            kit = um;
-            continue;
-         }
-
-         // --kit:ucrt
-         if (QWORD_PTR (arg + 0) == QWORD_PTR L"crt") {
-            kit = ucrt;
-            continue;
-         }
-
+      if (argc < 3 || argc > 5) {
          goto BAD_END_USAGE;
       }
 
-      // --????:
-      if (arg[4] == L':') {
-         // --type:
-         if (QWORD_PTR arg == QWORD_PTR L"type") {
-            if (type != type_bottom) {
+      while (*++argv) {
+         wchar_t const *restrict arg = *argv;
+         // all command line arguments should start with "--"
+         if (DWORD_PTR arg != DWORD_PTR L"--") {
+            goto BAD_END_USAGE;
+         }
+
+         // --kit:
+         if (QWORD_PTR (arg + 2) == QWORD_PTR L"kit:") {
+            if (kit != kit_bottom) {
                goto BAD_END_USAGE;
             }
-            arg += 5;
 
-            // --type:lib
-            if (QWORD_PTR arg == QWORD_PTR L"lib") {
-               type = lib;
-               continue;
-            }
-
-            // --type:include
-            if (1
-               && QWORD_PTR (arg + 0) == QWORD_PTR L"incl"
-               && QWORD_PTR (arg + 4) == QWORD_PTR L"ude"
-            ) {
-               type = include;
-               continue;
-            }
-
-            goto BAD_END_USAGE;
-         }
-
-         // --arch:
-         if (QWORD_PTR arg == QWORD_PTR L"arch") {
-            if (arch != arch_bottom) {
+            // all valid options begin with "u"
+            // --kit:u
+            if (arg[6] != L'u') {
                goto BAD_END_USAGE;
             }
-            arg += 5;
 
-            // --arch:x86
-            if (QWORD_PTR arg == QWORD_PTR L"x86") {
-               arch = x86;
+            // --kit:um
+            if (DWORD_PTR (arg + 7) == DWORD_PTR L"m") {
+               kit = um;
                continue;
             }
 
-            // --arch:x64
-            if (QWORD_PTR arg == QWORD_PTR L"x64") {
-               arch = x64;
-               continue;
-            }
-
-            // --arch:arm
-            if (QWORD_PTR arg == QWORD_PTR L"arm") {
-               arch = arm;
-               continue;
-            }
-
-            // --arch:arm64
-            if (1
-               && QWORD_PTR (arg + 0) == QWORD_PTR L"arm6"
-               && DWORD_PTR (arg + 4) == DWORD_PTR L"4"
-            ) {
-               arch = arm64;
+            // --kit:ucrt
+            if (QWORD_PTR (arg + 7) == QWORD_PTR L"crt") {
+               kit = ucrt;
                continue;
             }
 
             goto BAD_END_USAGE;
          }
-      }
 
-      // --version:
-      if (1
-         && QWORD_PTR (arg + 0) == QWORD_PTR L"vers"
-         && QWORD_PTR (arg + 4) == QWORD_PTR L"ion:"
-      ) {
-         if (version) {
-            goto BAD_END_USAGE;
+         // --????:
+         if (arg[6] == L':') {
+            // --type:
+            if (QWORD_PTR (arg + 2) == QWORD_PTR L"type") {
+               if (type != type_bottom) {
+                  goto BAD_END_USAGE;
+               }
+
+               // --type:lib
+               if (QWORD_PTR (arg + 7) == QWORD_PTR L"lib") {
+                  type = lib;
+                  continue;
+               }
+
+               // --type:include
+               if (1
+                  && QWORD_PTR (arg +  7) == QWORD_PTR L"incl"
+                  && QWORD_PTR (arg + 11) == QWORD_PTR L"ude"
+               ) {
+                  type = include;
+                  continue;
+               }
+
+               goto BAD_END_USAGE;
+            }
+
+            // --arch:
+            if (QWORD_PTR (arg + 2) == QWORD_PTR L"arch") {
+               if (arch != arch_bottom) {
+                  goto BAD_END_USAGE;
+               }
+
+               // --arch:x86
+               if (QWORD_PTR (arg + 7) == QWORD_PTR L"x86") {
+                  arch = x86;
+                  continue;
+               }
+
+               // --arch:x64
+               if (QWORD_PTR (arg + 7) == QWORD_PTR L"x64") {
+                  arch = x64;
+                  continue;
+               }
+
+               // --arch:arm
+               if (QWORD_PTR (arg + 7) == QWORD_PTR L"arm") {
+                  arch = arm;
+                  continue;
+               }
+
+               // --arch:arm64
+               if (1
+                  && QWORD_PTR (arg +  7) == QWORD_PTR L"arm6"
+                  && DWORD_PTR (arg + 11) == DWORD_PTR L"4"
+               ) {
+                  arch = arm64;
+                  continue;
+               }
+
+               goto BAD_END_USAGE;
+            }
          }
-         version = arg + 8;
-         continue;
-      }
 
-      goto BAD_END_USAGE;
+         // --version:
+         if (1
+            && QWORD_PTR (arg + 2) == QWORD_PTR L"vers"
+            && QWORD_PTR (arg + 6) == QWORD_PTR L"ion:"
+         ) {
+            if (version) {
+               goto BAD_END_USAGE;
+            }
+            version = arg + 10;
+            continue;
+         }
+
+         goto BAD_END_USAGE;
+      }
    }
 
    DWORD regVal_sz;
+   // get the size of the key
    {
-      LSTATUS res = RegGetValueW(
+      LSTATUS const res = RegGetValueW(
          HKEY_LOCAL_MACHINE,
          regKey,
          regVal,
@@ -176,13 +172,9 @@ void start(void) {
       }
    }
 
-   if (type == lib && arch == arch_bottom) {
-      goto BAD_END_USAGE;
-   }
-
    // eventually we are going to have something like
    // C:\Program Files (x86)\Windows Kits\10\include\10.0.00000.0\ucrt
-   size_t InstallationFolder_sz = 0
+   size_t SdkPath_sz = 0
       + regVal_sz          // null byte used for path separator
       + sizeof(L"lib")
       + sizeof(L"10.0.00000.0")
@@ -190,10 +182,14 @@ void start(void) {
       + sizeof(L"arm64")
       + 8;                 // extra 4 wchars in case or something
 
-   wchar_t *const SdkPath = __builtin_alloca(InstallationFolder_sz);
+   wchar_t *const SdkPath = HeapAlloc(GetProcessHeap(), 0, SdkPath_sz);
+
+   if (SdkPath == NULL) {
+      goto BAD_END_WINDOWS;
+   }
 
    {
-      LSTATUS res = RegGetValueW(
+      LSTATUS const res = RegGetValueW(
          HKEY_LOCAL_MACHINE,
          regKey,
          regVal,
@@ -208,6 +204,7 @@ void start(void) {
       }
    }
 
+   // write head starts at the \0 from the registry value
    wchar_t *SdkPath_wh =
       SdkPath + (regVal_sz / sizeof(wchar_t) - 1);
 
@@ -217,6 +214,9 @@ void start(void) {
       QWORD_PTR SdkPath_wh = QWORD_PTR L"ude\\"; SdkPath_wh += 4;
       break;
    case lib:
+      if (arch == arch_bottom) {
+         goto BAD_END_USAGE;
+      }
       QWORD_PTR SdkPath_wh = QWORD_PTR L"lib\\"; SdkPath_wh += 4;
       break;
    case type_bottom:
@@ -260,9 +260,9 @@ void start(void) {
             }
          }
 
-         QWORD nextVersion0 = QWORD_PTR (dir.cFileName + 0);
-         QWORD nextVersion1 = QWORD_PTR (dir.cFileName + 4);
-         QWORD nextVersion2 = QWORD_PTR (dir.cFileName + 8);
+         QWORD const nextVersion0 = QWORD_PTR (dir.cFileName + 0);
+         QWORD const nextVersion1 = QWORD_PTR (dir.cFileName + 4);
+         QWORD const nextVersion2 = QWORD_PTR (dir.cFileName + 8);
          if (nextVersion0 < currentVersion0) {
             continue;
          }
@@ -351,25 +351,18 @@ void start(void) {
       );
    }
 
-   ExitProcess(0);
-   __builtin_unreachable();
+   return 0;
 
    BAD_END_USAGE:
-   {
-      WriteConsoleW(
-         GetStdHandle(STD_ERROR_HANDLE),
-         usage,
-         sizeof(usage) / sizeof(WCHAR) - 1,
-         (DWORD *) &hStdout,
-         0
-      );
-      ExitProcess(1);
-      __builtin_unreachable();
-   }
+   WriteConsoleW(
+      GetStdHandle(STD_ERROR_HANDLE),
+      usage,
+      sizeof(usage) / sizeof(WCHAR) - 1,
+      (DWORD *) &hStdout,
+      0
+   );
+   return 1;
 
    BAD_END_WINDOWS:
-   {
-      ExitProcess(GetLastError());
-      __builtin_unreachable();
-   }
+   return GetLastError();
 }
