@@ -1,11 +1,13 @@
 n := winsdk
-mode := debug
+mode := release
 
 ifeq ($(mode), debug)
 	cflags += -g
 else
 	cflags += -Ofast
 endif
+
+libpath := $(shell bin/winsdk.exe --type:lib --kit:um --arch:x64)
 
 cflags += -nostdlib
 cflags += -ffreestanding
@@ -18,7 +20,7 @@ cflags += -lshell32
 cflags += -ladvapi32
 cflags += -Xlinker /nodefaultlib
 cflags += -Xlinker /subsystem:console
-cflags += -Xlinker "/libpath:C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64"
+cflags += -Xlinker "/libpath:$(libpath)"
 
 bin/$n.exe: src/$n.c bin Makefile
 	clang $< $(cflags) -o $@
